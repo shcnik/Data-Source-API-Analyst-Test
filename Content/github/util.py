@@ -1,11 +1,5 @@
-from objects import GHRepositiory
-
-def parse_repo(repo: str | tuple[str, str] | GHRepositiory) -> tuple[str, str]:
-    repo_fullname = ''
-    if repo is GHRepositiory:
-        repo_fullname = repo.full_name
-    elif repo is tuple:
-        repo_fullname = f'{repo[0]}/{repo[1]}'
+def parse_repo(repo: str | tuple[str, str]) -> tuple[str, str]:
+    if repo is tuple:
+        return repo
     else:
-        repo_fullname = repo
-    return repo_fullname.split('/')
+        return repo.split('/')

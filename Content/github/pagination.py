@@ -2,6 +2,7 @@ from client import GHClient
 from collections.abc import Sequence
 import re
 from copy import copy
+from requests import Response
 
 def parse_cmds(links: str) -> dict[str, str]:
     regex = re.compile('<https://api\.github\.com/([A-Za-z0-9_/\?&=]*)>; rel="([a-z]*)"')
@@ -10,11 +11,10 @@ def parse_cmds(links: str) -> dict[str, str]:
         res[rel] = cmd
     return res
 
-class GHPaginatedList[T]:
-    def __init__(self, client: GHClient, content: Sequence[T], object_type: type, links: str, step: int = 1):
+class GHPaginatedList:
+    def __init__(self, client: GHClient, content: Sequence[dict], links: str, step: int = 1):
         self.client = client
         self.content = content
-        self.object_type = object_type
         self.refs = parse_cmds(links)
         self.pos = 0
         self.step = 1
@@ -22,7 +22,7 @@ class GHPaginatedList[T]:
     def move(self, rel: str):
         r = self.client.make_request(self.refs[rel])
         self.refs = parse_cmds(r.headers['links'])
-        self.content = [self.object_type(self.client, **obj) for obj in r.json()]
+        self.content = r.json()
     
     def next_page(self):
         self.move('next')
@@ -36,10 +36,10 @@ class GHPaginatedList[T]:
     def last_page(self):
         self.move('last')
     
-    def at_start(self):
+    def at_start(self) -> bool:
         return 'prev' not in self.refs
 
-    def at_end(self):
+    def at_end(self) -> bool:
         return 'next' not in self.refs
     
     def __iter__(self):
@@ -51,7 +51,7 @@ class GHPaginatedList[T]:
             self.pos = len(self.content) - 1
         return self
     
-    def next(self) -> T:
+    def next(self) -> dict:
         self.pos += self.step
         if self.pos >= len(self.content):
             if self.at_end():
@@ -65,7 +65,7 @@ class GHPaginatedList[T]:
             self.pos = len(self.content) - 1
         return self.content[self.pos]
 
-    def __getitem__(self, key) -> T:
+    def __getitem__(self, key) -> dict:
         if key >= 0:
             self.first_page()
             while key >= len(self.content):
@@ -79,7 +79,7 @@ class GHPaginatedList[T]:
                 self.prev_page()
             return self.content[key]
     
-    def __reversed__(self) -> GHPaginatedList[T]:
+    def __reversed__(self) -> GHPaginatedList:
         rev = copy(self)
         rev.step = -self.step
         return rev
